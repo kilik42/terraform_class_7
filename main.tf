@@ -19,6 +19,7 @@ variable avail_zone{}
 variable env_prefix{}
 variable region{}
 variable my_ip{}
+variable instance_type{}
 
 resource "aws_vpc" "myapp-vpc" {
   cidr_block = var.vpc_cidr_block
@@ -121,7 +122,8 @@ resource "aws_security_group" "myapp-sg" {
   }
 
   egress {
-    
+    from_port   = 0
+    to_port     = 0
     protocol    = "-1"
     # protocol    = "-1" # all protocols
     cidr_blocks = ["0.0.0.0/0"]     
@@ -132,3 +134,39 @@ resource "aws_security_group" "myapp-sg" {
 output "vpc_id" {
   value = aws_vpc.myapp-vpc.id
 }
+
+data "aws_ami" "latest-amazon-linux-image"{
+  most_recent = true   
+
+  # ami = "ami-0157af9aea2eef346"
+  owners = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-arm64"]
+  }
+  filter{
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+output "ami_id" {
+  description = "The latest Amazon Linux 2023 AMI ID"
+  value = data.aws_ami.latest-amazon-linux-image.id
+}
+resource "aws_instance" "myapp-instance-1" {
+  ami           = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+  # set the subnet to public subnet
+  subnet_id     = aws_subnet.myapp-subnet-2.id
+  #security group attachment
+  security_groups = [aws_security_group.myapp-sg.id]
+  availability_zone = var.avail_zone
+  associate_public_ip_address = true # so i can access it from the internet
+  
+
+  tags = {
+    Name = "${var.env_prefix}-instance-1"
+  }
+}
+
